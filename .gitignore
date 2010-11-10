@@ -1,0 +1,10 @@
+bin/com/
+bin/classes.dex
+bin/resources.ap_
+default.properties
+libs/
+obj/
+gen/
+local.env.mk
+#Makefile#
+Makefile~
