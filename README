@@ -1,0 +1,6 @@
+GoldenEye is a central face recognition based authentication service/system for Android. Android applications can use this service to verify an user before using the saved login credentials for authentication.
+
+Authors :
+
+* Kowshik Prakasam <first-name AT gmail DOT com>
+* Shashank Hegde <last-name DOT first-name AT gmail DOT com>
