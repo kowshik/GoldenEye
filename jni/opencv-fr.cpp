@@ -1,11 +1,7 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
-#include <opencv/cvaux.h>
-#include <opencv/cxcore.h>
-#include <opencv/cvwimage.h>
-#include <opencv/ml.h>
-#include <opencv/cxmisc.h>
-#include <opencv2/objdetect/objdetect.hpp>
+
+
 
 /*
 	Tries to convert a given image into greyscale. If its not possible to convert the image, 
