@@ -1,1 +1,51 @@
-My GitHub Page
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	<meta name="description" content="Your description goes here" />
+	<meta name="keywords" content="your,keywords,goes,here" />
+	<meta name="author" content="Your Name" />
+	<link rel="stylesheet" type="text/css" href="stylesheets/project.css" title="andreas07" media="screen,projection" />
+	<title>JPregel</title>
+</head>
+<script type="text/javascript" src="src/wordzap.js">
+</script>
+<body onLoad="javascript:setHeight('home')">
+ 
+<div id="wrap">
+
+
+<div id="leftside">
+	
+	<div id="menu">
+		<a class="active" href="#">Home</a>
+		<a href="developers.html">Developers</a>
+		<a href="team.html">Team</a> 
+	</div>
+</div>
+
+<a href="http://github.com/kowshik/JPregel"><img style="position: absolute; top: 0; right: 0; border: 0;" src="http://s3.amazonaws.com/github/ribbons/forkme_right_red_aa0000.png" alt="Fork me on GitHub" /></a>
+
+
+<div id="content">
+	
+        <h1>JPregel<br></h1>
+	<h2></h2>
+	<br>
+	<br>
+	<br>
+	<br>
+	<h3>Goal</h3>
+	<p>Development of a system and a Java API for large-scale graph processing based on Google's Pregel
+	<br>
+	<br>
+	<br>
+	<h3>Description</h3>
+	<p>The system aids distributed processing of large graphs. It also provides a Java API for developing distributed computing solutions to graph problems. The API abstracts a distributed computational model for graphs proposed in Google's research paper : <a href="pregel_paper.pdf">Pregel: A System for Large-Scale Graph Processing</a>.
+<br><br>Programs that use our API are expressed as a sequence of iterations. Each iteration follows a vertex-centric approach that involves asynchronous computations running locally and independently on every vertex of the graph. At runtime the system composes the output of each computation to scale to huge graphs.<br><br>
+Our initial dev releases will offer API support for implementing solutions to some classical graph problems like <a href="http://en.wikipedia.org/wiki/PageRank">PageRank</a>, <a href="http://en.wikipedia.org/wiki/Dijkstra's_algorithm">Djikstra's Shortest Path</a> whose execution times grow with large input graphs. The system can be deployed on a cluster of machines that communicate through <a href="http://en.wikipedia.org/wiki/Java_remote_method_invocation">Java RMI</a>.</p>
+</div>
+
+</div>
+</body>
+</html>
