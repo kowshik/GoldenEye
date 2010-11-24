@@ -12,16 +12,16 @@ class GoldenEyeJNI {
 
   static {
     try {
-    	//load the library, make sure that libandroid-opencv.so is in your <project>/libs/armeabi directory
-    	//so that android sdk automatically installs it along with the app.
-        System.loadLibrary("opencv-fr");
+  	     System.loadLibrary("goldeneye");
     } catch (UnsatisfiedLinkError e) {
-    	//badness
     	throw e;
-     
     }
   }
 
-  public final static native int convertToGreyScale(String jarg1, String jarg2);
-  public final static native int detectFaces(String jarg1, String jarg2, String jarg3);
+  public final static native String convertToGreyScale(String jarg1);
+  public final static native String detectFaces(String jarg1);
+  public final static native int train(String jarg1, int jarg2, String jarg3);
+  public final static native String recognizeFace(String jarg1, String jarg2);
+  public final static native void init(String jarg1, String jarg2, String jarg3);
+  public final static native void destroy();
 }

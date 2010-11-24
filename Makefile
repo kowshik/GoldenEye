@@ -25,13 +25,13 @@ SWIG_IS = $(wildcard jni/*.i)
 
 ANDROID_MKS = $(wildcard jni/*.mk)
 
-SWIG_MAIN = jni/opencv-fr.i
+SWIG_MAIN = jni/goldeneye.i
 
 SWIG_JAVA_DIR = src/com/android/goldeneye/core
 SWIG_JAVA_OUT = $(wildcard $(SWIG_JAVA_DIR)/*.java)
 
 SWIG_C_DIR = jni/gen
-SWIG_C_OUT = $(SWIG_C_DIR)/opencv-fr-jni_wrap.cpp
+SWIG_C_OUT = $(SWIG_C_DIR)/goldeneye_jni_wrap.cpp
 
 # The real native library stripped of symbols
 LIB		= libs/armeabi-v7a/$(LIBNAME) libs/armeabi/$(LIBNAME)

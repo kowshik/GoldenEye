@@ -7,11 +7,9 @@ include $(OPENCV_CONFIG)
 
 LOCAL_LDLIBS += $(OPENCV_LIBS) -llog
     
-LOCAL_C_INCLUDES +=  $(OPENCV_INCLUDES) 
+LOCAL_C_INCLUDES +=  $(OPENCV_INCLUDES) goldeneye.h
 
-LOCAL_MODULE    := opencv-fr
-
-LOCAL_MODULE    := opencv-fr
-LOCAL_SRC_FILES := opencv-fr.cpp gen/opencv-fr-jni_wrap.cpp
+LOCAL_MODULE    := goldeneye
+LOCAL_SRC_FILES :=  goldeneye.cpp gen/goldeneye_jni_wrap.cpp
 
 include $(BUILD_SHARED_LIBRARY)

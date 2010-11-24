@@ -9,12 +9,28 @@
 package com.android.goldeneye.core;
 
 public class GoldenEye {
-  public static int convertToGreyScale(String inputImgPath, String greyScaleImgPath) {
-    return GoldenEyeJNI.convertToGreyScale(inputImgPath, greyScaleImgPath);
+  public static String convertToGreyScale(String inputImgPath) {
+    return GoldenEyeJNI.convertToGreyScale(inputImgPath);
   }
 
-  public static int detectFaces(String inputImgPath, String outputImgPath, String haarClassifierXmlPath) {
-    return GoldenEyeJNI.detectFaces(inputImgPath, outputImgPath, haarClassifierXmlPath);
+  public static String detectFaces(String inputImgPath) {
+    return GoldenEyeJNI.detectFaces(inputImgPath);
+  }
+
+  public static int train(String name, int numImages, String imgPathPrefix) {
+    return GoldenEyeJNI.train(name, numImages, imgPathPrefix);
+  }
+
+  public static String recognizeFace(String inputImgPath, String outputImgPath) {
+    return GoldenEyeJNI.recognizeFace(inputImgPath, outputImgPath);
+  }
+
+  public static void init(String haarClassifierXml, String outputFolder, String imgExtension) {
+    GoldenEyeJNI.init(haarClassifierXml, outputFolder, imgExtension);
+  }
+
+  public static void destroy() {
+    GoldenEyeJNI.destroy();
   }
 
 }

@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout android:id="@+id/RelativeLayout01"
-	android:layout_width="fill_parent" android:layout_height="fill_parent"
-	xmlns:android="http://schemas.android.com/apk/res/android">
+	android:orientation="horizontal" android:layout_width="fill_parent"
+	android:layout_height="fill_parent" xmlns:android="http://schemas.android.com/apk/res/android">
 	<SurfaceView android:id="@+id/surface_view"
-		android:layout_width="520sp" android:layout_height="230sp"></SurfaceView>
-	<Button android:layout_height="wrap_content" android:id="@+id/btn"
-		android:layout_below="@+id/surface_view" android:text="Take Picture"
-		android:layout_width="wrap_content"></Button>
+		android:layout_alignParentTop="true" android:layout_alignParentLeft="true"
+		android:layout_width="fill_parent" android:layout_height="fill_parent"></SurfaceView>
+	<ImageView android:id="@+id/image_view"
+		android:layout_alignParentTop="true" android:layout_alignParentLeft="true"
+		android:layout_width="fill_parent" android:layout_height="wrap_content"></ImageView>
+	<Button android:layout_height="70sp" android:id="@+id/btnSnap"
+		android:layout_alignParentRight="true" android:text="Snap"
+		android:layout_width="90sp" android:layout_centerVertical="true"></Button>
+	<Button android:layout_height="70sp" android:id="@+id/btnTrain" android:layout_alignParentRight="true"
+		android:layout_below="@+id/btnSnap" android:text="Train"
+		android:layout_width="90sp" android:layout_centerVertical="true"></Button>
 </RelativeLayout>

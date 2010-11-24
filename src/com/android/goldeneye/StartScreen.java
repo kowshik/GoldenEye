@@ -15,16 +15,21 @@
  */
 package com.android.goldeneye;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.List;
 import java.util.Random;
+import java.util.Vector;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnDismissListener;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.CompressFormat;
@@ -34,13 +39,16 @@ import android.hardware.Camera;
 import android.hardware.Camera.Size;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.Window;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
 
 import com.android.goldeneye.core.GoldenEye;
 
@@ -49,16 +57,134 @@ import com.android.goldeneye.core.GoldenEye;
 public class StartScreen extends Activity implements SurfaceHolder.Callback,
 		OnClickListener {
 	private static final String INPUT_FILE = GoldenEyeConstants.FACEDETECTION_FOLDER
-			+ "/test.jpg";
+			+ "/fr-input.jpg";
 	private static final String OUTPUT_FILE = GoldenEyeConstants.FACEDETECTION_FOLDER
-			+ "/test-withfaces.jpg";
+			+ "/fr-output.jpg";
 
+	private static final String TRAIN_FILE_PREFIX = GoldenEyeConstants.FACEDETECTION_FOLDER
+			+ "/train-";
+
+	private ImageView imageView;
 	private SurfaceView iSurfaceView;
-	SurfaceHolder mHolder;
-	Camera mCamera;
-	private Button btn;
+	private SurfaceHolder mHolder;
+	private Camera mCamera;
+	private Button btnSnap;
+	private Button btnTrain;
+
+	private boolean pictureTaken;
+	private Handler snapTimerHandler;
+	private SnapTimerThread snapTimerThread;
+	private TrainTimerThread trainTimerThread;
+	private Handler trainTimerHandler;
+	private NameInputDialogListener nameInputListener;
+	private transient String personName;
+	private boolean trainTimerHandlerFlag;
+
+	private class TrainTimerThread implements Runnable {
+
+		private boolean timerStatus;
+		private Handler trainTimerHandler;
+		private Thread t;
+
+		public TrainTimerThread(Handler trainTimerHandler) {
+			this.trainTimerHandler = trainTimerHandler;
+			t = new Thread(this);
+			t.start();
+		}
+
+		public void startTimer() {
+			timerStatus = true;
+		}
+
+		public void stopTimer() {
+			timerStatus = false;
+		}
+
+		public void run() {
+			while (true) {
+
+				for (int snapCount = 1; snapCount <= GoldenEyeConstants.TRAINING_SNAP_COUNT
+						&& timerStatus; snapCount++) {
+					for (int timer = GoldenEyeConstants.TRAINING_TIMER; timer >= 0; timer--) {
+
+						Message msg = trainTimerHandler.obtainMessage();
+						Bundle aBundle = new Bundle();
+						aBundle.putIntArray(GoldenEyeConstants.TRAIN_TIMER_KEY,
+								new int[] { snapCount, timer });
+						msg.setData(aBundle);
+						trainTimerHandlerFlag = false;
+						trainTimerHandler.sendMessage(msg);
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+						while (!trainTimerHandlerFlag) {
+
+						}
+
+					}
+					if (snapCount == GoldenEyeConstants.TRAINING_SNAP_COUNT) {
+						stopTimer();
+					}
+				}
+
+			}
+
+		}
+
+	}
+
+	private class SnapTimerThread implements Runnable {
+
+		private boolean timerStatus;
+		private Handler snapTimerHandler;
+		private Thread t;
+
+		public SnapTimerThread(Handler snapTimerHandler) {
+			this.snapTimerHandler = snapTimerHandler;
+			t = new Thread(this);
+			t.start();
+		}
+
+		public void startTimer() {
+			timerStatus = true;
+		}
+
+		public void stopTimer() {
+			timerStatus = false;
+		}
+
+		public void run() {
+			while (true) {
+
+				for (int i = GoldenEyeConstants.TRAINING_TIMER; i >= 0
+						&& timerStatus; i--) {
+
+					Message msg = snapTimerHandler.obtainMessage();
+					Bundle aBundle = new Bundle();
+					aBundle.putInt(GoldenEyeConstants.SNAP_TIMER_KEY, i);
+					msg.setData(aBundle);
+					snapTimerHandler.sendMessage(msg);
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					if (i == 0) {
+						stopTimer();
+					}
+				}
+
+			}
+
+		}
+
+	}
 
 	private void initGoldenEye() {
+		pictureTaken = false;
+
 		Log.i(GoldenEyeConstants.LOG_TAG, "initializing GoldenEye");
 		if (Environment.MEDIA_MOUNTED.equals(Environment
 				.getExternalStorageState())) {
@@ -72,29 +198,92 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 					+ GoldenEyeConstants.LOCAL_HAAR_CLASSIFIER_XML);
 			File localHaarXmlFile = new File(
 					GoldenEyeConstants.LOCAL_HAAR_CLASSIFIER_XML);
+			if (!localHaarXmlFile.exists()) {
+				Log.i(GoldenEyeConstants.LOG_TAG, "local haar xml doesnt exist");
+				BufferedInputStream haarXmlReader = new BufferedInputStream(
+						this.getResources().openRawResource(
+								GoldenEyeConstants.HAAR_CLASSIFIER_XML));
+				Log.i(GoldenEyeConstants.LOG_TAG,
+						"opened file handle for reading local haar xml");
+				try {
 
-			InputStream haarXmlReader = this.getResources().openRawResource(
-					GoldenEyeConstants.HAAR_CLASSIFIER_XML);
-			try {
-				OutputStream haarXmlWriter = new FileOutputStream(
-						localHaarXmlFile);
-
-				int aByte = -1;
-				while ((aByte = haarXmlReader.read()) != -1) {
-					haarXmlWriter.write(aByte);
+					BufferedOutputStream haarXmlWriter = new BufferedOutputStream(
+							new FileOutputStream(localHaarXmlFile));
+					Log.i(GoldenEyeConstants.LOG_TAG,
+							"opened file handle for writing local haar xml");
+					byte[] buffer = new byte[10000];
+					int numBytes = -1;
+					while ((numBytes = haarXmlReader.read(buffer)) != -1) {
+						haarXmlWriter.write(buffer, 0, numBytes);
+					}
+					haarXmlReader.close();
+					haarXmlWriter.close();
+					Log.i(GoldenEyeConstants.LOG_TAG, "closed haar xml handles");
+				} catch (IOException e) {
+					Log.e(GoldenEyeConstants.LOG_TAG,
+							"IOException in StartScreen.initGoldenEye() while manipulating Haar Classifier XML : "
+									+ GoldenEyeConstants.LOCAL_HAAR_CLASSIFIER_XML
+									+ " -> " + e.getStackTrace());
+					finish();
 				}
-			} catch (IOException e) {
-				Log.e(GoldenEyeConstants.LOG_TAG,
-						"IOException in StartScreen.initGoldenEye() while manipulating Haar Classifier XML : "
-								+ GoldenEyeConstants.LOCAL_HAAR_CLASSIFIER_XML
-								+ " -> " + e.getStackTrace());
-				finish();
+			} else {
+				Log.i(GoldenEyeConstants.LOG_TAG,
+						"skipping creation of existing file : "
+								+ GoldenEyeConstants.LOCAL_HAAR_CLASSIFIER_XML);
 			}
 		} else {
 			Log.e(GoldenEyeConstants.LOG_TAG,
-					"Externam storage not mounted .. dying");
+					"External storage not mounted .. dying");
 			finish();
 		}
+
+		// -------------
+		GoldenEye.init(GoldenEyeConstants.LOCAL_HAAR_CLASSIFIER_XML,
+				GoldenEyeConstants.FACEDETECTION_FOLDER,
+				GoldenEyeConstants.IMG_EXTENSION);
+		// -------------
+
+		snapTimerHandler = new Handler() {
+			public void handleMessage(Message msg) {
+				int timerValue = msg.getData().getInt(
+						GoldenEyeConstants.SNAP_TIMER_KEY);
+
+				if (timerValue == 0) {
+					btnSnap.setText("...");
+					mCamera.takePicture(null, null, null, snapCallback);
+					return;
+				}
+				btnSnap.setText("" + timerValue);
+
+			}
+		};
+
+		snapTimerThread = new SnapTimerThread(snapTimerHandler);
+
+		trainTimerHandler = new Handler() {
+			public void handleMessage(Message msg) {
+				int[] values = msg.getData().getIntArray(
+						GoldenEyeConstants.TRAIN_TIMER_KEY);
+				int snapCount = values[0];
+				int timerValue = values[1];
+
+				if (timerValue == 0) {
+					btnTrain.setText("...");
+					trainCallBack.setSnapCount(snapCount);
+					if (snapCount == GoldenEyeConstants.TRAINING_SNAP_COUNT) {
+						trainCallBack.moveToTrainPhase();
+					}
+					mCamera.takePicture(null, null, null, trainCallBack);
+					
+				} else {
+					btnTrain.setText("" + timerValue);
+				}
+				trainTimerHandlerFlag = true;
+				return;
+			}
+		};
+		trainTimerThread = new TrainTimerThread(trainTimerHandler);
+
 		Log.i(GoldenEyeConstants.LOG_TAG, "initialized GoldenEye !");
 
 	}
@@ -122,10 +311,12 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 		setContentView(R.layout.main);
 
 		initGoldenEye();
-
-		btn = (Button) findViewById(R.id.btn);
-		btn.setOnClickListener(this);
+		btnSnap = (Button) findViewById(R.id.btnSnap);
+		btnSnap.setOnClickListener(this);
+		btnTrain = (Button) findViewById(R.id.btnTrain);
+		btnTrain.setOnClickListener(this);
 		iSurfaceView = (SurfaceView) findViewById(R.id.surface_view);
+		imageView = (ImageView) findViewById(R.id.image_view);
 
 		mHolder = iSurfaceView.getHolder();
 		mHolder.addCallback(this);
@@ -135,12 +326,15 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 
 	@Override
 	protected void onDestroy() {
-		super.onDestroy();/*
-						 * File f = new File(localHaarXmlPath); if (f.delete())
-						 * { Log.e("StartScreen", "Temporary file : " +
-						 * localHaarXmlPath + " could not be deleted on exit");
-						 * }
-						 */
+		super.onDestroy();
+
+		File localHaarXmlFile = new File(
+				GoldenEyeConstants.LOCAL_HAAR_CLASSIFIER_XML);
+		if (!localHaarXmlFile.delete()) {
+			Log.e("StartScreen", "Temporary file : " + localHaarXmlFile
+					+ " could not be deleted on exit");
+		}
+		GoldenEye.destroy();
 	}
 
 	public void surfaceCreated(SurfaceHolder holder) {
@@ -148,19 +342,12 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 		// to draw.
 
 		mCamera = Camera.open();
-
-		// mCamera.setPreviewCallback(iPreviewCallback);
 		try {
 			mCamera.setPreviewDisplay(holder);
-			Camera.Parameters params = mCamera.getParameters();
-			params.setPictureSize(500, 500);
-
-			mCamera.setParameters(params);
 
 		} catch (IOException exception) {
 			mCamera.release();
 			mCamera = null;
-			// TODO: add more exception handling logic here
 		}
 	}
 
@@ -227,11 +414,29 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 	}
 
 	public void onClick(View v) {
-		mCamera.takePicture(null, null, null, iPictureCallback);
+
+		if (v.getId() == R.id.btnSnap) {
+			if (!pictureTaken) {
+				snapTimerThread.startTimer();
+			} else {
+				btnSnap.setText("Snap");
+				pictureTaken = false;
+				iSurfaceView.setVisibility(View.VISIBLE);
+				imageView.setVisibility(View.INVISIBLE);
+				mCamera.startPreview();
+
+			}
+		} else if (v.getId() == R.id.btnTrain) {
+			iSurfaceView.setVisibility(View.VISIBLE);
+			imageView.setVisibility(View.INVISIBLE);
+			Log.i(GoldenEyeConstants.LOG_TAG, "train timer started");
+			mCamera.startPreview();
+			trainTimerThread.startTimer();
+		}
 
 	}
 
-	Camera.PictureCallback iPictureCallback = new Camera.PictureCallback() {
+	Camera.PictureCallback snapCallback = new Camera.PictureCallback() {
 
 		public void onPictureTaken(byte[] data, Camera camera) {
 
@@ -240,10 +445,8 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 			int width = bitmap.getWidth();
 			int height = bitmap.getHeight();
 
-			float scaleWidth = ((float) GoldenEyeConstants.FR_INP_WIDTH)
-					/ width;
-			float scaleHeight = ((float) GoldenEyeConstants.FR_INP_HEIGHT)
-					/ height;
+			float scaleWidth = ((float) iSurfaceView.getWidth()) / width;
+			float scaleHeight = ((float) iSurfaceView.getHeight()) / height;
 			Matrix matrix = new Matrix();
 			matrix.postScale(scaleWidth, scaleHeight);
 			Bitmap resizedBitmap = Bitmap.createBitmap(bitmap, 0, 0, width,
@@ -265,15 +468,161 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 
 			Log.i(GoldenEyeConstants.LOG_TAG,
 					"attempting opencv call to detect faces");
-			int detectFaces = GoldenEye.detectFaces(INPUT_FILE, OUTPUT_FILE,
-					GoldenEyeConstants.LOCAL_HAAR_CLASSIFIER_XML);
-			if (detectFaces == 0) {
-				Log.e(GoldenEyeConstants.LOG_TAG, "unable to detect face");
+
+			personName = GoldenEye.recognizeFace(INPUT_FILE, OUTPUT_FILE);
+
+			Log.e(GoldenEyeConstants.LOG_TAG, "personName detected : "
+					+ personName);
+
+			if (!personName.equals("")) {
+				imageView.setImageBitmap(BitmapFactory.decodeFile(OUTPUT_FILE));
+			}
+			btnSnap.setVisibility(View.VISIBLE);
+			iSurfaceView.setVisibility(View.INVISIBLE);
+			imageView.setVisibility(View.VISIBLE);
+			btnSnap.setText("Snap Again ?");
+			showDialog(GoldenEyeConstants.SHOW_NAME_DIALOG);
+			pictureTaken = true;
+		}
+	};
+
+	private TrainCallBack trainCallBack = new TrainCallBack();
+
+	private class TrainCallBack implements Camera.PictureCallback {
+		private int snapCount;
+		private boolean trainPhase;
+		private List<String> trainImgFilePaths;
+
+		public TrainCallBack() {
+			this.snapCount = -1;
+			this.trainPhase = false;
+			trainImgFilePaths = new Vector<String>();
+		}
+
+		public int getSnapCount() {
+			return snapCount;
+		}
+
+		public void setSnapCount(int snapCount) {
+			this.snapCount = snapCount;
+		}
+
+		public void moveToTrainPhase() {
+			this.trainPhase = true;
+		}
+
+		public void onPictureTaken(byte[] data, Camera camera) {
+
+			Log.i(GoldenEyeConstants.LOG_TAG, "writing training image to file");
+			Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+			int width = bitmap.getWidth();
+			int height = bitmap.getHeight();
+
+			float scaleWidth = ((float) iSurfaceView.getWidth()) / width;
+			float scaleHeight = ((float) iSurfaceView.getHeight()) / height;
+			Matrix matrix = new Matrix();
+			matrix.postScale(scaleWidth, scaleHeight);
+			Bitmap resizedBitmap = Bitmap.createBitmap(bitmap, 0, 0, width,
+					height, matrix, true);
+
+			String fileName = String.format(TRAIN_FILE_PREFIX + ""
+					+ getSnapCount() + ".jpg", System.currentTimeMillis());
+			new File(fileName).delete();
+			FileOutputStream outStream = null;
+			try {
+				outStream = new FileOutputStream(fileName);
+				resizedBitmap.compress(CompressFormat.JPEG, 80, outStream);
+				outStream.close();
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			} finally {
 			}
 
+			this.trainImgFilePaths.add(fileName);
+			if (this.trainPhase) {
+
+				this.trainPhase = false;
+				nameInputListener = new NameInputDialogListener(
+						trainImgFilePaths);
+				showDialog(GoldenEyeConstants.NAME_INPUT_DIALOG);
+			} else {
+				mCamera.startPreview();
+				trainTimerThread.startTimer();
+			}
+		}
+
+	}
+
+	@Override
+	protected Dialog onCreateDialog(int id) {
+		Dialog dialog = null;
+		AlertDialog.Builder builder = null;
+		switch (id) {
+		case GoldenEyeConstants.NAME_INPUT_DIALOG:
+			builder = new AlertDialog.Builder(this);
+			final EditText input = new EditText(this);
+			nameInputListener.setInputText(input);
+			builder.setMessage("").setTitle("Enter Name").setView(input)
+					.setCancelable(false)
+					.setPositiveButton("Okay", nameInputListener);
+			dialog = builder.create();
+			break;
+		case GoldenEyeConstants.SHOW_NAME_DIALOG:
+			builder = new AlertDialog.Builder(this);
+			builder.setTitle("Face Recognition result").setPositiveButton(
+					"Okay", null);
+			Log.i(GoldenEyeConstants.LOG_TAG, "person name in Dialog : "
+					+ personName);
+			if (personName.equals("")) {
+				builder.setMessage("Unable to recognize face");
+			} else {
+				builder.setMessage("Identified user : " + personName);
+			}
+			dialog = builder.create();
+			dialog.setOnDismissListener(new OnDismissListener() {
+
+				@Override
+				public void onDismiss(DialogInterface dialog) {
+					removeDialog(GoldenEyeConstants.SHOW_NAME_DIALOG);
+
+				}
+			});
+
+			break;
+		}
+		return dialog;
+	}
+
+	private class NameInputDialogListener implements
+			DialogInterface.OnClickListener {
+
+		private EditText input;
+		private List<String> trainImgFilePaths;
+
+		public NameInputDialogListener(List<String> trainImgFilePaths) {
+			this.trainImgFilePaths = trainImgFilePaths;
+		}
+
+		public void setInputText(EditText input) {
+			this.input = input;
+		}
+
+		@Override
+		public void onClick(DialogInterface dialog, int which) {
+			dialog.cancel();
+			String personName = input.getText().toString();
+			input.setText("");
+			Log.i(GoldenEyeConstants.LOG_TAG, "Got name : " + personName);
+			Log.i(GoldenEyeConstants.LOG_TAG, "training now");
+
+			GoldenEye.train(personName, GoldenEyeConstants.TRAINING_SNAP_COUNT,
+					TRAIN_FILE_PREFIX);
+			btnTrain.setText("Train");
 			mCamera.startPreview();
 
 		}
-	};
+	}
 
 }
