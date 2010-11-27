@@ -586,7 +586,7 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 				@Override
 				public void onDismiss(DialogInterface dialog) {
 					removeDialog(GoldenEyeConstants.SHOW_NAME_DIALOG);
-
+					finish();
 				}
 			});
 
