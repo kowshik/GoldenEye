@@ -37,6 +37,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.hardware.Camera;
 import android.hardware.Camera.Size;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -70,120 +71,65 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 	private Camera mCamera;
 	private Button btnSnap;
 	private Button btnTrain;
-
-	private boolean pictureTaken;
-	private Handler snapTimerHandler;
-	private SnapTimerThread snapTimerThread;
-	private TrainTimerThread trainTimerThread;
-	private Handler trainTimerHandler;
 	private NameInputDialogListener nameInputListener;
 	private transient String personName;
-	private boolean trainTimerHandlerFlag;
 
-	private class TrainTimerThread implements Runnable {
-
-		private boolean timerStatus;
-		private Handler trainTimerHandler;
-		private Thread t;
-
-		public TrainTimerThread(Handler trainTimerHandler) {
-			this.trainTimerHandler = trainTimerHandler;
-			t = new Thread(this);
-			t.start();
-		}
-
-		public void startTimer() {
-			timerStatus = true;
-		}
-
-		public void stopTimer() {
-			timerStatus = false;
-		}
-
-		public void run() {
-			while (true) {
-
-				for (int snapCount = 1; snapCount <= GoldenEyeConstants.TRAINING_SNAP_COUNT
-						&& timerStatus; snapCount++) {
-					for (int timer = GoldenEyeConstants.TRAINING_TIMER; timer >= 0; timer--) {
-
-						Message msg = trainTimerHandler.obtainMessage();
-						Bundle aBundle = new Bundle();
-						aBundle.putIntArray(GoldenEyeConstants.TRAIN_TIMER_KEY,
-								new int[] { snapCount, timer });
-						msg.setData(aBundle);
-						trainTimerHandlerFlag = false;
-						trainTimerHandler.sendMessage(msg);
-						try {
-							Thread.sleep(1000);
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-						while (!trainTimerHandlerFlag) {
-
-						}
-
-					}
-					if (snapCount == GoldenEyeConstants.TRAINING_SNAP_COUNT) {
-						stopTimer();
-					}
-				}
-
+	private class TrainTimerTask extends AsyncTask<Integer, Integer, Boolean> {
+		protected Boolean doInBackground(Integer... params) {
+			int actionType = params[0];
+			int timerCount = params[1];
+			int snapCount = 1;
+			if (actionType == GoldenEyeConstants.TRAIN_SELECT) {
+				snapCount = params[2];
 			}
-
-		}
-
-	}
-
-	private class SnapTimerThread implements Runnable {
-
-		private boolean timerStatus;
-		private Handler snapTimerHandler;
-		private Thread t;
-
-		public SnapTimerThread(Handler snapTimerHandler) {
-			this.snapTimerHandler = snapTimerHandler;
-			t = new Thread(this);
-			t.start();
-		}
-
-		public void startTimer() {
-			timerStatus = true;
-		}
-
-		public void stopTimer() {
-			timerStatus = false;
-		}
-
-		public void run() {
-			while (true) {
-
-				for (int i = GoldenEyeConstants.TRAINING_TIMER; i >= 0
-						&& timerStatus; i--) {
-
-					Message msg = snapTimerHandler.obtainMessage();
-					Bundle aBundle = new Bundle();
-					aBundle.putInt(GoldenEyeConstants.SNAP_TIMER_KEY, i);
-					msg.setData(aBundle);
-					snapTimerHandler.sendMessage(msg);
+			for (int i = 1; i <= snapCount; i++) {
+				for (int j = timerCount; j >= 0; j--) {
 					try {
+						publishProgress(j);
 						Thread.sleep(1000);
 					} catch (InterruptedException e) {
+						Log.i(GoldenEyeConstants.LOG_TAG,
+								"InterruptedException in doInBackground - TrainTimerTask");
 						e.printStackTrace();
+						return false;
 					}
-					if (i == 0) {
-						stopTimer();
+				}
+
+				if (actionType == GoldenEyeConstants.TRAIN_SELECT) {
+					trainCallBack.setSnapCount(i);
+					if (i == snapCount) {
+						trainCallBack.moveToTrainPhase();
 					}
+					mCamera.takePicture(null, null, null, trainCallBack);
+				} else if (actionType == GoldenEyeConstants.SNAP_SELECT) {
+					mCamera.takePicture(null, null, null, snapCallback);
 				}
 
 			}
 
+			return true;
 		}
 
+		protected void onProgressUpdate(Integer... timerVals) {
+			int timerVal = timerVals[0];
+			if (timerVal == 0) {
+				btnTrain.setText("...");
+			} else {
+				btnTrain.setText(timerVal + "");
+			}
+		}
+
+		protected void onPostExecute(Boolean result) {
+			if (result.booleanValue()) {
+				Log.i(GoldenEyeConstants.LOG_TAG, "doInBackground sent true");
+			} else {
+				Log.i(GoldenEyeConstants.LOG_TAG, "doInBackground sent false");
+			}
+		}
 	}
 
 	private void initGoldenEye() {
-		pictureTaken = false;
+	
 
 		Log.i(GoldenEyeConstants.LOG_TAG, "initializing GoldenEye");
 		if (Environment.MEDIA_MOUNTED.equals(Environment
@@ -242,47 +188,6 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 				GoldenEyeConstants.FACEDETECTION_FOLDER,
 				GoldenEyeConstants.IMG_EXTENSION);
 		// -------------
-
-		snapTimerHandler = new Handler() {
-			public void handleMessage(Message msg) {
-				int timerValue = msg.getData().getInt(
-						GoldenEyeConstants.SNAP_TIMER_KEY);
-
-				if (timerValue == 0) {
-					btnSnap.setText("...");
-					mCamera.takePicture(null, null, null, snapCallback);
-					return;
-				}
-				btnSnap.setText("" + timerValue);
-
-			}
-		};
-
-		snapTimerThread = new SnapTimerThread(snapTimerHandler);
-
-		trainTimerHandler = new Handler() {
-			public void handleMessage(Message msg) {
-				int[] values = msg.getData().getIntArray(
-						GoldenEyeConstants.TRAIN_TIMER_KEY);
-				int snapCount = values[0];
-				int timerValue = values[1];
-
-				if (timerValue == 0) {
-					btnTrain.setText("...");
-					trainCallBack.setSnapCount(snapCount);
-					if (snapCount == GoldenEyeConstants.TRAINING_SNAP_COUNT) {
-						trainCallBack.moveToTrainPhase();
-					}
-					mCamera.takePicture(null, null, null, trainCallBack);
-					
-				} else {
-					btnTrain.setText("" + timerValue);
-				}
-				trainTimerHandlerFlag = true;
-				return;
-			}
-		};
-		trainTimerThread = new TrainTimerThread(trainTimerHandler);
 
 		Log.i(GoldenEyeConstants.LOG_TAG, "initialized GoldenEye !");
 
@@ -416,22 +321,19 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 	public void onClick(View v) {
 
 		if (v.getId() == R.id.btnSnap) {
-			if (!pictureTaken) {
-				snapTimerThread.startTimer();
-			} else {
-				btnSnap.setText("Snap");
-				pictureTaken = false;
-				iSurfaceView.setVisibility(View.VISIBLE);
-				imageView.setVisibility(View.INVISIBLE);
-				mCamera.startPreview();
 
-			}
+			btnSnap.setText("Snap");
+	
+			iSurfaceView.setVisibility(View.VISIBLE);
+			imageView.setVisibility(View.INVISIBLE);
+			mCamera.startPreview();
+			new TrainTimerTask().execute(GoldenEyeConstants.SNAP_SELECT, 5);
+
 		} else if (v.getId() == R.id.btnTrain) {
 			iSurfaceView.setVisibility(View.VISIBLE);
 			imageView.setVisibility(View.INVISIBLE);
 			Log.i(GoldenEyeConstants.LOG_TAG, "train timer started");
-			mCamera.startPreview();
-			trainTimerThread.startTimer();
+			new TrainTimerTask().execute(GoldenEyeConstants.TRAIN_SELECT, 5, 5);
 		}
 
 	}
@@ -482,7 +384,7 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 			imageView.setVisibility(View.VISIBLE);
 			btnSnap.setText("Snap Again ?");
 			showDialog(GoldenEyeConstants.SHOW_NAME_DIALOG);
-			pictureTaken = true;
+			
 		}
 	};
 
@@ -542,14 +444,11 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 
 			this.trainImgFilePaths.add(fileName);
 			if (this.trainPhase) {
-
 				this.trainPhase = false;
-				nameInputListener = new NameInputDialogListener(
-						trainImgFilePaths);
+				nameInputListener = new NameInputDialogListener();
 				showDialog(GoldenEyeConstants.NAME_INPUT_DIALOG);
 			} else {
 				mCamera.startPreview();
-				trainTimerThread.startTimer();
 			}
 		}
 
@@ -599,10 +498,9 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 			DialogInterface.OnClickListener {
 
 		private EditText input;
-		private List<String> trainImgFilePaths;
 
-		public NameInputDialogListener(List<String> trainImgFilePaths) {
-			this.trainImgFilePaths = trainImgFilePaths;
+		public NameInputDialogListener() {
+
 		}
 
 		public void setInputText(EditText input) {

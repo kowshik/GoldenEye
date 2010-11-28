@@ -20,4 +20,6 @@ public interface GoldenEyeConstants {
 	String PROGRESSBAR_STATE_KEY = "progressbar_state";
 	int NAME_INPUT_DIALOG=0;
 	int SHOW_NAME_DIALOG=1;
+	int TRAIN_SELECT=1;
+	int SNAP_SELECT=2;
 }
