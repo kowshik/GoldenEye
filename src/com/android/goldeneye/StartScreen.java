@@ -40,8 +40,6 @@ import android.hardware.Camera.Size;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
-import android.os.Message;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -77,15 +75,19 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 	private class TrainTimerTask extends AsyncTask<Integer, Integer, Boolean> {
 		protected Boolean doInBackground(Integer... params) {
 			int actionType = params[0];
-			int timerCount = params[1];
-			int snapCount = 1;
+			int timerSeconds = params[1];
+			int numberOfSnaps = 1;
 			if (actionType == GoldenEyeConstants.TRAIN_SELECT) {
-				snapCount = params[2];
+				numberOfSnaps = params[2];
 			}
-			for (int i = 1; i <= snapCount; i++) {
-				for (int j = timerCount; j >= 0; j--) {
+			for (int snapCount = 1; snapCount <= numberOfSnaps; snapCount++) {
+				int timerCount = timerSeconds;
+				if (snapCount != 1) {
+					timerCount += 2;
+				}
+				for (; timerCount >= 0; timerCount--) {
 					try {
-						publishProgress(j,actionType);
+						publishProgress(timerCount, actionType);
 						Thread.sleep(1000);
 					} catch (InterruptedException e) {
 						Log.i(GoldenEyeConstants.LOG_TAG,
@@ -96,11 +98,12 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 				}
 
 				if (actionType == GoldenEyeConstants.TRAIN_SELECT) {
-					trainCallBack.setSnapCount(i);
-					if (i == snapCount) {
+					trainCallBack.setSnapCount(snapCount);
+					if (snapCount == numberOfSnaps) {
 						trainCallBack.moveToTrainPhase();
 					}
 					mCamera.takePicture(null, null, null, trainCallBack);
+
 				} else if (actionType == GoldenEyeConstants.SNAP_SELECT) {
 					mCamera.takePicture(null, null, null, snapCallback);
 				}
@@ -113,13 +116,13 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 		protected void onProgressUpdate(Integer... timerVals) {
 			int timerVal = timerVals[0];
 			int actionType = timerVals[1];
-			Button targetBtn=null;
-			if(actionType == GoldenEyeConstants.TRAIN_SELECT){
+			Button targetBtn = null;
+			if (actionType == GoldenEyeConstants.TRAIN_SELECT) {
 				targetBtn = btnTrain;
-			}else if(actionType == GoldenEyeConstants.SNAP_SELECT){
+			} else if (actionType == GoldenEyeConstants.SNAP_SELECT) {
 				targetBtn = btnSnap;
 			}
-			
+
 			if (timerVal == 0) {
 				targetBtn.setText("...");
 			} else {
@@ -137,7 +140,6 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 	}
 
 	private void initGoldenEye() {
-	
 
 		Log.i(GoldenEyeConstants.LOG_TAG, "initializing GoldenEye");
 		if (Environment.MEDIA_MOUNTED.equals(Environment
@@ -240,7 +242,10 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
-
+		if (mCamera != null) {
+			mCamera.stopPreview();
+			mCamera.release();
+		}
 		File localHaarXmlFile = new File(
 				GoldenEyeConstants.LOCAL_HAAR_CLASSIFIER_XML);
 		if (!localHaarXmlFile.delete()) {
@@ -331,7 +336,7 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 		if (v.getId() == R.id.btnSnap) {
 
 			btnSnap.setText("Snap");
-	
+
 			iSurfaceView.setVisibility(View.VISIBLE);
 			imageView.setVisibility(View.INVISIBLE);
 			mCamera.startPreview();
@@ -341,7 +346,7 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 			iSurfaceView.setVisibility(View.VISIBLE);
 			imageView.setVisibility(View.INVISIBLE);
 			Log.i(GoldenEyeConstants.LOG_TAG, "train timer started");
-			new TrainTimerTask().execute(GoldenEyeConstants.TRAIN_SELECT, 5, 5);
+			new TrainTimerTask().execute(GoldenEyeConstants.TRAIN_SELECT, 3, 5);
 		}
 
 	}
@@ -392,7 +397,7 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 			imageView.setVisibility(View.VISIBLE);
 			btnSnap.setText("Snap Again ?");
 			showDialog(GoldenEyeConstants.SHOW_NAME_DIALOG);
-			
+
 		}
 	};
 
@@ -458,6 +463,7 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 			} else {
 				mCamera.startPreview();
 			}
+
 		}
 
 	}
@@ -518,10 +524,11 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 		@Override
 		public void onClick(DialogInterface dialog, int which) {
 			dialog.cancel();
+
 			String personName = input.getText().toString();
 			input.setText("");
 			Log.i(GoldenEyeConstants.LOG_TAG, "Got name : " + personName);
-			Log.i(GoldenEyeConstants.LOG_TAG, "training now");
+			Log.i(GoldenEyeConstants.LOG_TAG, "Training now");
 
 			GoldenEye.train(personName, GoldenEyeConstants.TRAINING_SNAP_COUNT,
 					TRAIN_FILE_PREFIX);
@@ -529,6 +536,7 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 			mCamera.startPreview();
 
 		}
+
 	}
 
 }
