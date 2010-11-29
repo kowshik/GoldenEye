@@ -188,56 +188,6 @@ string GoldenEye::detectFaces(const string& imagePath) {
 	return "";
 }
 
-int GoldenEye::readImages(const string& path, const string& personName) {
-	ostringstream oss;
-	oss << "\nAttempting to load images for person : " << path;
-	__android_log_write(ANDROID_LOG_INFO, "NativeCode", oss.str().c_str());
-	DIR *imageDir = opendir(path.c_str());
-	struct dirent* epImages;
-
-	if (imageDir) {
-		while (epImages = readdir(imageDir)) {
-			if (epImages->d_type == DT_REG) {
-				oss.str("");
-				string fullPath = path + "/" + epImages->d_name;
-				this->trainingImages.push_back(pair<string, string> (
-						personName, fullPath));
-				oss << "\tFound : " << fullPath;
-				__android_log_write(ANDROID_LOG_INFO, "NativeCode",
-						oss.str().c_str());
-				if (resizeWidth == 0) {
-					__android_log_write(ANDROID_LOG_INFO, "NativeCode",
-							"Setting values for resize widths heights");
-					IplImage* img = cvLoadImage(fullPath.c_str(),
-							CV_LOAD_IMAGE_GRAYSCALE);
-
-					if (!img){
-						__android_log_write(ANDROID_LOG_INFO, "NativeCode",
-								"img is NULL :-(");
-						return 0;
-					}
-					resizeWidth = img->width;
-					resizeHeight = img->height;
-					cvReleaseImage(&img);
-					oss.str("");
-					oss << "Setting resize width, heights to : " << resizeWidth
-							<< "," << resizeHeight;
-					__android_log_write(ANDROID_LOG_INFO, "NativeCode",
-							oss.str().c_str());
-				}
-			}
-		}
-	} else {
-		oss.str("");
-		oss << "\nCouldn't open the directory : " << path << "\n";
-		__android_log_write(ANDROID_LOG_INFO, "NativeCode", oss.str().c_str());
-		return 0;
-	}
-	closedir(imageDir);
-	return 1;
-
-}
-
 bool GoldenEye::isSpecialDir(const string& dirName) {
 	if (dirName == "." || dirName == "..") {
 		return true;
@@ -246,41 +196,23 @@ bool GoldenEye::isSpecialDir(const string& dirName) {
 }
 
 int GoldenEye::copyFile(const string& src, const string& target) {
+
 	ostringstream oss;
-	oss << "\nAttempting to copy : " << src << " to " << target;
-	__android_log_write(ANDROID_LOG_INFO, "NativeCode", oss.str().c_str());
 
-	ifstream srcHandle(src.c_str(), ios::in | ios::binary | ios::ate);
-	ofstream targetHandle(target.c_str(), ios::out | ios::binary | ios::trunc);
-	if (!srcHandle.is_open()) {
-		oss.str("");
-		oss << "\nUnable to open : " << src << " for copying";
-		__android_log_write(ANDROID_LOG_ERROR, "NativeCode", oss.str().c_str());
-		return 0;
-	}
-	if (!targetHandle.is_open()) {
-		oss.str("");
-		oss << "\nUnable to open : " << target << " for copying";
-		__android_log_write(ANDROID_LOG_ERROR, "NativeCode", oss.str().c_str());
-		return 0;
-	}
-
-	ifstream::pos_type size = srcHandle.tellg();
-	char * memblock = new char[size];
-	srcHandle.seekg(0, ios::beg);
-	srcHandle.read(memblock, size);
-	srcHandle.close();
-
-	targetHandle.write(memblock, size);
-	targetHandle.close();
-
-	delete[] memblock;
-
-	IplImage* pInpImage = cvLoadImage(target.c_str());
+	IplImage* pInpImage = cvLoadImage(src.c_str());
 	IplImage* greyImage, *boxedImage;
 	CvRect faceRect;
 
-	detectProminentFace(pInpImage, &greyImage, &boxedImage, &faceRect);
+	if (!detectProminentFace(pInpImage, &greyImage, &boxedImage, &faceRect)
+			|| faceRect.width <= 0) {
+		oss.str("");
+		oss << "\nSkipping image. No face found in : " << src;
+		__android_log_write(ANDROID_LOG_ERROR, "NativeCode", oss.str().c_str());
+		cvReleaseImage(&pInpImage);
+		cvReleaseImage(&greyImage);
+		cvReleaseImage(&boxedImage);
+		return 0;
+	}
 
 	//crop image
 	IplImage* croppedImage = cropImage(greyImage, faceRect);
@@ -303,12 +235,66 @@ int GoldenEye::copyFile(const string& src, const string& target) {
 
 	return 1;
 }
+
+int GoldenEye::readImages(const string& path, const string& personName) {
+	ostringstream oss;
+	oss << "\nAttempting to load images for person : " << path;
+	__android_log_write(ANDROID_LOG_INFO, "NativeCode", oss.str().c_str());
+	DIR *imageDir = opendir(path.c_str());
+	struct dirent* epImages;
+	int atleastOneImage = -1;
+
+	if (imageDir) {
+		while (epImages = readdir(imageDir)) {
+			if (epImages->d_type == DT_REG) {
+				oss.str("");
+				string fullPath = path + "/" + epImages->d_name;
+				this->trainingImages.push_back(pair<string, string> (
+						personName, fullPath));
+				oss << "\tFound : " << fullPath;
+				__android_log_write(ANDROID_LOG_INFO, "NativeCode",
+						oss.str().c_str());
+				if (resizeWidth == 0) {
+					__android_log_write(ANDROID_LOG_INFO, "NativeCode",
+							"Setting values for resize widths heights");
+					IplImage* img = cvLoadImage(fullPath.c_str(),
+							CV_LOAD_IMAGE_GRAYSCALE);
+
+					if (!img) {
+						__android_log_write(ANDROID_LOG_INFO, "NativeCode",
+								"img is NULL :-(");
+						return 0;
+					}
+					resizeWidth = img->width;
+					resizeHeight = img->height;
+					cvReleaseImage(&img);
+					oss.str("");
+					oss << "Setting resize width, heights to : " << resizeWidth
+							<< "," << resizeHeight;
+					__android_log_write(ANDROID_LOG_INFO, "NativeCode",
+							oss.str().c_str());
+				}
+				atleastOneImage = 1;
+			}
+		}
+	} else {
+		oss.str("");
+		oss << "\nCouldn't open the directory : " << path << "\n";
+		__android_log_write(ANDROID_LOG_INFO, "NativeCode", oss.str().c_str());
+		return 0;
+	}
+	closedir(imageDir);
+	return atleastOneImage;
+
+}
+
 int GoldenEye::loadExistingImages() {
 	ostringstream oss;
 	oss << "\nAttempting to load existing images";
 	__android_log_write(ANDROID_LOG_INFO, "NativeCode", oss.str().c_str());
 	DIR *dirImgs, *dirPersonImgs;
 	struct dirent *epImgs;
+	int atleastOneImage = -1;
 
 	dirImgs = opendir(this->trainedImgsPath.c_str());
 	if (dirImgs != NULL) {
@@ -317,8 +303,12 @@ int GoldenEye::loadExistingImages() {
 				personNames.push_back(epImgs->d_name);
 				ostringstream oss;
 				oss << this->trainedImgsPath << "/" << epImgs->d_name;
-				if (!this->readImages(oss.str(), epImgs->d_name)) {
+				int readImagesResult = this->readImages(oss.str(),
+						epImgs->d_name);
+				if (!readImagesResult) {
 					return 0;
+				} else if (readImagesResult == 1) {
+					atleastOneImage = 1;
 				}
 			}
 
@@ -332,7 +322,7 @@ int GoldenEye::loadExistingImages() {
 		return 0;
 	}
 
-	return 1;
+	return atleastOneImage;
 }
 
 int GoldenEye::addNewImages(const string& name, int numOfImgs,
@@ -362,20 +352,22 @@ int GoldenEye::addNewImages(const string& name, int numOfImgs,
 			oss.str("");
 			oss << newFolder << "/" << i << "." << this->imgExtension;
 			string newTrainingImage = oss.str();
-			if (!this->copyFile(thisTrainingImg, newTrainingImage)) {
+			if (this->copyFile(thisTrainingImg, newTrainingImage)) {
+
+				this->trainingImages.push_back(pair<string, string> (name,
+						newTrainingImage));
+				oss.str("");
+				oss << "\n\tAdded new image : " << name << ","
+						<< newTrainingImage;
+				__android_log_write(ANDROID_LOG_INFO, "NativeCode",
+						oss.str().c_str());
+			} else {
 				oss.str("");
 				oss << "\nUnable to copy file : " << thisTrainingImg << " to "
 						<< newTrainingImage;
 				__android_log_write(ANDROID_LOG_ERROR, "NativeCode",
 						oss.str().c_str());
-				return 0;
 			}
-			this->trainingImages.push_back(pair<string, string> (name,
-					newTrainingImage));
-			oss.str("");
-			oss << "\n\tAdded new image : " << name << "," << newTrainingImage;
-			__android_log_write(ANDROID_LOG_INFO, "NativeCode",
-					oss.str().c_str());
 
 		} else {
 			oss.str("");
@@ -392,8 +384,15 @@ int GoldenEye::loadImages(const string& name, int numOfImgs,
 	ostringstream oss;
 	oss << "\nAttempting to load images";
 	__android_log_write(ANDROID_LOG_INFO, "NativeCode", oss.str().c_str());
-	if (!this->loadExistingImages() || !this->addNewImages(name, numOfImgs,
-			imagePathPrefix)) {
+	int resultLoadImgs = this->loadExistingImages();
+	if (resultLoadImgs == -1) {
+		oss.str("");
+		oss << "\nDidn't find any existing images to load\n";
+		__android_log_write(ANDROID_LOG_INFO, "NativeCode", oss.str().c_str());
+	}
+
+	int resultAddImgs = this->addNewImages(name, numOfImgs, imagePathPrefix);
+	if ((resultLoadImgs == -1 || resultLoadImgs == 0) && (!resultAddImgs)) {
 		return 0;
 	}
 
@@ -670,20 +669,25 @@ int GoldenEye::train(const string& name, int numOfImgs,
 		__android_log_write(ANDROID_LOG_INFO, "NativeCode",
 				"\nSuccessfully gathered training images\n");
 
-		pca();
-		string avgImgPath = this->outputImgFolder + "/avgimage."
-				+ this->imgExtension;
-		cvSaveImage(avgImgPath.c_str(), this->pAvgTrainImg);
+		if (pca()) {
+			string avgImgPath = this->outputImgFolder + "/avgimage."
+					+ this->imgExtension;
+			cvSaveImage(avgImgPath.c_str(), this->pAvgTrainImg);
 
-		this->projectedTrainFaceMat = cvCreateMat(this->trainingImages.size(),
-				this->nEigens, CV_32FC1);
-		offset = projectedTrainFaceMat->step / sizeof(float);
-		for (i = 0; i < this->trainingImages.size(); i++) {
-			cvEigenDecomposite(faceImageArr[i], this->nEigens,
-					this->eigenVectArr, 0, 0, this->pAvgTrainImg,
-					this->projectedTrainFaceMat->data.fl + i * offset);
+			this->projectedTrainFaceMat = cvCreateMat(
+					this->trainingImages.size(), this->nEigens, CV_32FC1);
+			offset = projectedTrainFaceMat->step / sizeof(float);
+			for (i = 0; i < this->trainingImages.size(); i++) {
+				cvEigenDecomposite(faceImageArr[i], this->nEigens,
+						this->eigenVectArr, 0, 0, this->pAvgTrainImg,
+						this->projectedTrainFaceMat->data.fl + i * offset);
+			}
+			this->storeEigenFaceImages();
+		}else{
+			__android_log_write(ANDROID_LOG_ERROR, "NativeCode",
+							"\nError in PCA\n");
+			return 0;
 		}
-		this->storeEigenFaceImages();
 
 	} else {
 		__android_log_write(ANDROID_LOG_ERROR, "NativeCode",
@@ -697,7 +701,7 @@ int GoldenEye::train(const string& name, int numOfImgs,
 
 // Do the Principal Component Analysis, finding the average image
 // and the eigenfaces that represent any image in the given dataset.
-void GoldenEye::pca() {
+int GoldenEye::pca() {
 	__android_log_write(ANDROID_LOG_INFO, "NativeCode",
 			"Inside GoldenEye::pca()");
 	int i;
@@ -705,13 +709,18 @@ void GoldenEye::pca() {
 	CvSize faceImgSize;
 
 	int numOfImgs = this->trainingImages.size();
-	// set the number of eigenvalues to use
+
+	// set the number of eigenvalues to use. it should be greater than 2
 	this->nEigens = numOfImgs - 1;
 
+	if(this->nEigens<1){
+		__android_log_write(ANDROID_LOG_ERROR, "NativeCode",
+					"Can't do PCA. nEigens < 1.");
+		return 0;
+	}
+
 	// allocate the eigenvector images
-
 	faceImgSize.width = this->faceImageArr[0]->width;
-
 	faceImgSize.height = this->faceImageArr[0]->height;
 
 	this->eigenVectArr
@@ -723,7 +732,6 @@ void GoldenEye::pca() {
 		this->eigenVectArr[i] = cvCreateImage(faceImgSize, IPL_DEPTH_32F, 1);
 		__android_log_write(ANDROID_LOG_INFO, "NativeCode",
 				"Added to eigenVectArr");
-
 	}
 	__android_log_write(ANDROID_LOG_INFO, "NativeCode", "Loaded eigenVectArr");
 	// allocate the eigenvalue array
@@ -744,6 +752,7 @@ void GoldenEye::pca() {
 			&calcLimit, pAvgTrainImg, eigenValMat->data.fl);
 
 	cvNormalize(eigenValMat, eigenValMat, 1, 0, CV_L1, 0);
+	return 1;
 }
 
 void GoldenEye::freeDataStructures() {

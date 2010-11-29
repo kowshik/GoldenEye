@@ -85,7 +85,7 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 			for (int i = 1; i <= snapCount; i++) {
 				for (int j = timerCount; j >= 0; j--) {
 					try {
-						publishProgress(j);
+						publishProgress(j,actionType);
 						Thread.sleep(1000);
 					} catch (InterruptedException e) {
 						Log.i(GoldenEyeConstants.LOG_TAG,
@@ -112,10 +112,18 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 
 		protected void onProgressUpdate(Integer... timerVals) {
 			int timerVal = timerVals[0];
+			int actionType = timerVals[1];
+			Button targetBtn=null;
+			if(actionType == GoldenEyeConstants.TRAIN_SELECT){
+				targetBtn = btnTrain;
+			}else if(actionType == GoldenEyeConstants.SNAP_SELECT){
+				targetBtn = btnSnap;
+			}
+			
 			if (timerVal == 0) {
-				btnTrain.setText("...");
+				targetBtn.setText("...");
 			} else {
-				btnTrain.setText(timerVal + "");
+				targetBtn.setText(timerVal + "");
 			}
 		}
 

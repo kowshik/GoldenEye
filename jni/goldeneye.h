@@ -20,7 +20,7 @@ private:
 	IplImage* convertToGreyScale(const IplImage *pImage);
 	IplImage* detectFaces(const IplImage *pImage);
 	int boxFaces(IplImage* pImage, CvSeq *pFaceRectSeq);
-	void pca();
+	int pca();
 	int readImages(const string& path, const string& personName);
 	int loadExistingImages();
 	int loadImages(const string& name,int numOfImgs, const string& imagePathPrefix) ;
