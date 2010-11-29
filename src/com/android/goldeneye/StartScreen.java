@@ -213,7 +213,7 @@ public class StartScreen extends Activity implements SurfaceHolder.Callback,
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-		setContentView(R.layout.main);
+		setContentView(R.layout.main_goldeneye_facerecognizer);
 
 		initGoldenEye();
 		btnSnap = (Button) findViewById(R.id.btnSnap);
